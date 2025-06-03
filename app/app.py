@@ -11,8 +11,18 @@ load_dotenv()
 PORT = int(os.getenv('PORT', 3001))
 TIMEOUT = int(os.getenv('TIMEOUT', 10))
 DEBUG = os.getenv('DEBUG', 'false').lower() == 'true'
+WHITELIST = os.getenv('WHITELIST', '0.0.0.0').split(',')
 
 app = Flask(__name__)
+
+@app.before_request
+def limit_remote_addr():
+    print(f"Request from {request.remote_addr}")
+    if "0.0.0.0" in WHITELIST:
+        return  # Allow all requests if '
+    
+    if request.remote_addr not in WHITELIST:
+        return jsonify({'error': 'Access denied'}), 403
 
 @app.route('/')
 def index():
