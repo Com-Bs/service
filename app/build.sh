@@ -25,4 +25,12 @@ docker run -it -d -p $PORT:$PORT\
     --security-opt seccomp=unconfined \
     --name $CONTAINER_NAME $IMAGE_NAME
 
-echo "App is running at http://localhost:$PORT"
+# Give the container a moment to start
+sleep 2
+
+# Check if container is running
+if docker ps --filter "name=$CONTAINER_NAME" --filter "status=running" | grep -q $CONTAINER_NAME; then
+    echo "App is running at http://localhost:$PORT"
+else
+    echo "Failed to start the container."
+fi
