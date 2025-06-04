@@ -17,7 +17,6 @@ app = Flask(__name__)
 
 @app.before_request
 def limit_remote_addr():
-    print(f"Request from {request.remote_addr}")
     if "0.0.0.0" in WHITELIST:
         return
     
@@ -80,7 +79,7 @@ def run_compile():
                     "--ro-bind", "/bin", "/bin",
                     "--ro-bind", "/usr", "/usr",
                     "--ro-bind", "/lib", "/lib",
-                    "--ro-bind", "/lib64", "/lib64",
+                    # "--ro-bind", "/lib64", "/lib64",
                     "--ro-bind", "/etc", "/etc",
                     # Create necessary system directories  
                     "--tmpfs", "/tmp",
@@ -114,7 +113,6 @@ def run_compile():
         
         # return all program outputs as a list, except for first (spim output) and last (empty string after last new line)
         output = result.stdout.decode()
-        print(output)
         
         # in different environments, the output is different, but what follows 'Loaded' is the actual output
         output = output[output.find('Loaded'):]  
@@ -131,4 +129,4 @@ def run_compile():
         shutil.rmtree(sandbox_dir, ignore_errors=True)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=PORT, debug=DEBUG)
+    app.run(host='0.0.0.0', port=PORT, debug=DEBUG, ssl_context='adhoc')
