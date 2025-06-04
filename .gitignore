@@ -1,5 +1,6 @@
 service/
 __pycache__/
+.env
 
 # ignore assembly files
 *.s
