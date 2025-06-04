@@ -53,17 +53,20 @@ class Lexer():
         nextNewLine = self.program.find('\n', pos)
         nextNewLine = nextNewLine - 1 if nextNewLine != -1 else self.programLength - 1
         
+        lineNumber = self.program[:pos].count('\n') + 1
+        columnNumber = pos - lastNewLine + 1
         errorOutput = (
             f"\n>>> {errorType} error found at line " 
-            + str(self.program[:pos].count('\n') + 1)
+            + str(lineNumber)
             + ": " + errorMessage + "\n"
             + self.program[lastNewLine:nextNewLine+1] + "\n"
-            + " " * (pos - lastNewLine) + "^\n" 
+            + " " * (columnNumber - 1) + "^\n" 
         )
         if self.strictMode:
             raise Exception(errorOutput)
         else:
             print(errorOutput)
+            return lineNumber, columnNumber
     
     def _handleErrors(self, c):        
         self.printErrorLine(self._getErrorMessage(c))

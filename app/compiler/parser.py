@@ -11,6 +11,11 @@ class Parser():
         
         self.strictMode = strictMode
         
+        # used to store the first error
+        self.lineNumber = 0
+        self.columnNumber = 0
+        self.firstErrorMessage = ""
+        
         # pasar las variables globales al lexer, y pedir el primer token
         self.lexer = Lexer(program, strictMode=strictMode)
         self._getToken()
@@ -79,8 +84,15 @@ class Parser():
         if expectedToken == self.token:
             self._getToken()
         else:
+            line, col = self.lexer.printErrorLine(errorMsg, self.lastTokenPosition)
+            
+            # store the first error's position
+            if self.isSyntaxCorrect:
+                self.lineNumber = line
+                self.columnNumber = col
+                self.firstErrorMessage = errorMsg
+            
             self.isSyntaxCorrect = False
-            self.lexer.printErrorLine(errorMsg, self.lastTokenPosition)
             
             # when we ignore the error, we act as if it was there, and not consume any token to continue parsing from there
             # otherwise, we consume tokens until we find the one we were expecting

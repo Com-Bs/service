@@ -1,4 +1,5 @@
 from compiler import Compiler
+from compiler.parser import Parser
 from flask import Flask, request, jsonify
 import subprocess
 import os
@@ -72,29 +73,38 @@ def run_compile():
         input_data = '\n'.join(str(inp) for inp in inputs) + '\n'
         try:
             # Create a more restricted sandbox with specific directory bindings
+            commands = [
+                "bwrap",
+                # Bind all necessary system directories
+                "--ro-bind", "/bin", "/bin",
+                "--ro-bind", "/usr", "/usr",
+                "--ro-bind", "/lib", "/lib"
+            ]
+            
+            # only bind /lib64 if it exists, to avoid errors
+            if os.path.exists("/lib32"):
+                print("Binding /lib32")
+                commands.extend(["--ro-bind", "/lib32", "/lib32"])
+            
+            commands += [
+                "--ro-bind", "/etc", "/etc",
+                # Create necessary system directories  
+                "--tmpfs", "/tmp",
+                "--ro-bind", "/proc", "/proc",
+                "--ro-bind", "/dev", "/dev",
+                # Bind our sandbox directory
+                "--bind", sandbox_dir, sandbox_dir,
+                # Security options - only IPC and UTS, no network or user/pid
+                "--unshare-ipc", 
+                "--unshare-uts",
+                "--die-with-parent",
+                "--new-session",
+                # The actual command
+                "spim", "-file", f"{sandbox_dir}/output.s"
+            ]
+            
             result = subprocess.run(
-                [
-                    "bwrap",
-                    # Bind all necessary system directories
-                    "--ro-bind", "/bin", "/bin",
-                    "--ro-bind", "/usr", "/usr",
-                    "--ro-bind", "/lib", "/lib",
-                    "--ro-bind", "/lib64", "/lib64",
-                    "--ro-bind", "/etc", "/etc",
-                    # Create necessary system directories  
-                    "--tmpfs", "/tmp",
-                    "--ro-bind", "/proc", "/proc",
-                    "--ro-bind", "/dev", "/dev",
-                    # Bind our sandbox directory
-                    "--bind", sandbox_dir, sandbox_dir,
-                    # Security options - only IPC and UTS, no network or user/pid
-                    "--unshare-ipc", 
-                    "--unshare-uts",
-                    "--die-with-parent",
-                    "--new-session",
-                    # The actual command
-                    "spim", "-file", f"{sandbox_dir}/output.s"
-                ],
+                commands,
                 input=input_data.encode(),
                 capture_output=True,
                 timeout=TIMEOUT
@@ -127,6 +137,28 @@ def run_compile():
     finally:
         # clean up the sandbox directory, including files
         shutil.rmtree(sandbox_dir, ignore_errors=True)
+
+@app.route('/checkSyntax', methods=['POST'])
+def check_syntax():
+    data = request.get_json()
+    program = data.get('program', '')
+    
+    if not program:
+        return jsonify({'error': 'No program provided'}), 400
+    
+    try:
+        parser = Parser(program)
+        parser.parse()
+        
+        if parser.isSyntaxCorrect:
+            return jsonify({'isSyntaxCorrect': True}), 200
+        else:
+            return jsonify({'isSyntaxCorrect': False, 
+                            'error': parser.firstErrorMessage, 
+                            'line': parser.lineNumber,
+                            'column': parser.columnNumber}), 200
+    except Exception as e:
+        return jsonify({'error': 'Error parsing program', 'message': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT, debug=DEBUG, ssl_context='adhoc')
