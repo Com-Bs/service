@@ -22,6 +22,7 @@ fi
 echo "Running container..."
 docker run -it -d -p $PORT:$PORT\
     --cap-add=SYS_ADMIN \
+    --security-opt apparmor=unconfined \
     --security-opt seccomp=unconfined \
     --name $CONTAINER_NAME $IMAGE_NAME
 

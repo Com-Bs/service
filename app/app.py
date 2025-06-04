@@ -66,16 +66,6 @@ def run_compile():
             compiler = Compiler(program, strictMode=True)
             compiler.compile(f'{sandbox_dir}/output.s')
             
-            # result = subprocess.run(
-            #     "cat {}".format(f"{sandbox_dir}/output.s"),
-            #     shell=True,
-            #     capture_output=True,
-            #     text=True,
-            #     timeout=TIMEOUT
-            # )
-            # print("Compiled MIPS assembly code:")
-            # print(result.stdout)
-            
         except Exception as e:
             return jsonify({'error': 'Error compiling', 'message': str(e)}), 400
             
