@@ -31,7 +31,7 @@ sleep 2
 
 # Check if container is running
 if docker ps --filter "name=$CONTAINER_NAME" --filter "status=running" | grep -q $CONTAINER_NAME; then
-    echo "App is running at http://localhost:$PORT"
+    echo "App is running at https://localhost:$PORT"
 else
     echo "Failed to start the container."
 fi

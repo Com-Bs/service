@@ -79,7 +79,7 @@ def run_compile():
                     "--ro-bind", "/bin", "/bin",
                     "--ro-bind", "/usr", "/usr",
                     "--ro-bind", "/lib", "/lib",
-                    # "--ro-bind", "/lib64", "/lib64",
+                    "--ro-bind", "/lib64", "/lib64",
                     "--ro-bind", "/etc", "/etc",
                     # Create necessary system directories  
                     "--tmpfs", "/tmp",
