@@ -227,7 +227,7 @@ def check_test_cases():
     test_cases = data.get('testCases', [])
     
     returnDict = {'results': []}
-    resultTemplate = {'error': '', 'line': -1, 'column': -1, 'ouptut': 0}
+    resultTemplate = {'error': '', 'line': -1, 'column': -1, 'output': 0}
     
     # check inputs
     if not program:
