@@ -300,10 +300,12 @@ class Parser():
         if self.token == TokenType.LPAR: # it's a function call
             self._match(TokenType.LPAR)
             
-            n = ASTnode(type=NodeTypes.Call, label=idLexeme, pos=self.tokenPosition)
-            n.children = self._args()
+            v = ASTnode(type=NodeTypes.Call, label=idLexeme, pos=self.tokenPosition)
+            v.children = self._args()
             
             self._match(TokenType.RPAR, "Expected ')' to close function call", True)
+            
+            n = self._idSimpleExpression(v)
         else:
             # check if the id has an index
             index = None
