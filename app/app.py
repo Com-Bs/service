@@ -284,7 +284,7 @@ def check_test_cases():
                 if not compiler.isTypingValid(prints=False):
                     resultDict['error'] = compiler.typeChecker.firstErrorMessage
                     returnDict['results'].append(resultDict)
-                    break
+                    continue
                     
                 parser = compiler.typeChecker.parser
                 if not parser.isSyntaxValid:
@@ -292,7 +292,7 @@ def check_test_cases():
                     resultDict['line'] = parser.lineNumber
                     resultDict['column'] = parser.columnNumber
                     returnDict['results'].append(resultDict)
-                    break
+                    continue
                 
                 lexer = parser.lexer
                 if not lexer.isSyntaxValid:
@@ -300,14 +300,14 @@ def check_test_cases():
                     resultDict['line'] = lexer.errorLine
                     resultDict['column'] = lexer.errorColumn
                     returnDict['results'].append(resultDict)
-                    break
+                    continue
                 
                 compiler.compile(f'{sandbox_dir}/output.s')
                 
             except Exception as e:
                 resultDict['error'] = str(e)
                 returnDict['results'].append(resultDict)
-                break
+                continue
 
             try:
                 # Create a more restricted sandbox with specific directory bindings
@@ -349,12 +349,12 @@ def check_test_cases():
             except subprocess.TimeoutExpired:
                 resultDict['error'] = 'Timeout expired while running the compiled file'
                 returnDict['results'].append(resultDict)
-                break
+                continue
             
             except Exception as e:
                 resultDict['error'] = str(e)
                 returnDict['results'].append(resultDict)
-                break
+                continue
             
             # if there was an error running the compiled file
             if result.stderr:
@@ -364,7 +364,7 @@ def check_test_cases():
                 
                 resultDict['error'] = stderr_msg
                 returnDict['results'].append(resultDict)
-                break
+                continue
             
             # return all program outputs as a list, except for first (spim output) and last (empty string after last new line)
             output = result.stdout.decode()
