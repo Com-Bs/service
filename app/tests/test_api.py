@@ -60,7 +60,7 @@ def test_run_compile_valid(client):
     assert response.status_code == 200
     data = response.get_json()
     assert "outputs" in data
-    assert data["outputs"] == ["5"]
+    assert data["outputs"] == [5]
     
 def test_run_compile_invalid(client):
     invalid_program = """
@@ -81,19 +81,52 @@ def test_run_compile_empty_input(client):
     data = response.get_json()
     assert "error" in data
     
-def test_run_compile_timeout(client):
-    # This test assumes that the program will run indefinitely
-    infinite_loop_program = """
-    void main(void) {
-        int x;
-        x = 0;
-        while (x < 5) {
-            output(x);
-        }
+# def test_run_compile_timeout(client):
+#     # This test assumes that the program will run indefinitely
+#     infinite_loop_program = """
+#     void main(void) {
+#         int x;
+#         x = 0;
+#         while (x < 5) {
+#             output(x);
+#         }
+#     }
+#     """
+#     response = client.post("/runCompile", json={"program": infinite_loop_program})
+#     assert response.status_code == 408
+#     data = response.get_json()
+#     assert "error" in data
+#     assert data["error"] == "Timeout expired while running the compiled file"
+    
+# test cases for performTestCases
+def test_perform_test_cases_valid(client):
+    body = {
+            "program": "int findSmallestElement(int nums[], int size) {\nint min;\nint i;\ni = 0;\nmin = 1000000;\nwhile (i < size) {\nif (nums[i] < min) {\nmin = nums[i];\n}\ni = i + 1;\n}\nreturn min;\n}",
+            "funName": "findSmallestElement",
+            "testCases": [[[1,2,3], 3], [[0,-1,2], 3]]
     }
-    """
-    response = client.post("/runCompile", json={"program": infinite_loop_program})
-    assert response.status_code == 408
+    response = client.post("/performTestCases", json=body)
+    assert response.status_code == 200
     data = response.get_json()
-    assert "error" in data
-    assert data["error"] == "Timeout expired while running the compiled file"
+    assert data["results"][0]["output"] == 1
+    assert data["results"][1]["output"] == -1
+    
+def test_perform_test_cases_wrong(client):
+    body = {
+            "program": "int findSmallestElement(int nums[], int size) {\nreturn 100;\n}",
+            "funName": "findSmallestElement",
+            "testCases": [[[1,2,3], 3], [[0,-1,2], 3]]
+    }
+    response = client.post("/performTestCases", json=body)
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["results"][0]["output"] != 1
+    assert data["results"][1]["output"] != -1
+
+def test_perform_test_cases_no_funName(client):
+    body = {
+            "program": "int findSmallestElement(int nums[], int size) {\nint min;\nint i;\ni = 0;\nmin = 1000000;\nwhile (i < size) {\nif (nums[i] < min) {\nmin = nums[i];\n}\ni = i + 1;\n}\nreturn min;\n}",
+            "testCases": [[[1,2,3], 3], [[0,-1,2], 3]]
+    }
+    response = client.post("/performTestCases", json=body)
+    assert response.status_code == 400

@@ -10,6 +10,7 @@ class TypeChecker():
         self.strictMode = strictMode
         
         self.parser = Parser(program, strictMode)
+        self.firstErrorMessage = ""
         
         self.AST = self.parser.parse(False) if AST == None else AST
         
@@ -37,7 +38,7 @@ class TypeChecker():
             idType = self.st.getType(node.label)
             
             if idType == None:
-                self.parser.printErrorLine("Undeclared ID: " + node.label, node.pos, "Semantic")
+                self._printErrorLine("Undeclared ID: " + node.label, node.pos, "Semantic")
                 self.isTypingValid = False
                 return None
             
@@ -46,9 +47,9 @@ class TypeChecker():
                     self.isTypingValid = False
                     
                     if idType != Types.Array:
-                        self.parser.printErrorLine("Cannot index non-array ID: " + node.label, node.pos, "Semantic")
+                        self._printErrorLine("Cannot index non-array ID: " + node.label, node.pos, "Semantic")
                     else:
-                        self.parser.printErrorLine("Indexing value has to be Int in ID: " + node.label, node.pos, "Semantic")
+                        self._printErrorLine("Indexing value has to be Int in ID: " + node.label, node.pos, "Semantic")
                     
                     return None
                                     
@@ -65,7 +66,7 @@ class TypeChecker():
                 callType = Types.Void
             
             if callType == None:
-                self.parser.printErrorLine("Calling undeclared function: " + node.label, node.pos, "Semantic")
+                self._printErrorLine("Calling undeclared function: " + node.label, node.pos, "Semantic")
                 self.isTypingValid = False
                 return None
             
@@ -77,7 +78,7 @@ class TypeChecker():
                 paramTypes = [Types.Int]
             
             if len(node.children) != len(paramTypes):
-                self.parser.printErrorLine("Wrong number of parameters in functions: " + node.label, node.pos, "Semantic")
+                self._printErrorLine("Wrong number of parameters in functions: " + node.label, node.pos, "Semantic")
                 self.isTypingValid = False
                 return None
             
@@ -85,12 +86,12 @@ class TypeChecker():
                 argType = self._doCheckTyping(node.children[i], funLabel)
                 
                 if argType == None:
-                    self.parser.printErrorLine(f"Undeclared identifier {node.children[i].label}")
+                    self._printErrorLine(f"Undeclared identifier {node.children[i].label}")
                     self.isTypingValid
                     return callType
                 
                 if argType != paramTypes[i]:
-                    self.parser.printErrorLine(f"Param {node.children[i].label} of wrong type, expected {str(paramTypes[i].value)}", node.children[i].pos, "Semantic")
+                    self._printErrorLine(f"Param {node.children[i].label} of wrong type, expected {str(paramTypes[i].value)}", node.children[i].pos, "Semantic")
                     self.isTypingValid = False
                     return callType
                 
@@ -118,7 +119,7 @@ class TypeChecker():
             returnType = Types.Void if len(node.children) == 0 else self._doCheckTyping(node.children[0], funLabel)
             
             if returnType != self.st.getType(funLabel):
-                self.parser.printErrorLine("Return value of wrong type, expected " + str(self.st.getType(funLabel).value), node.pos, "Semantic")
+                self._printErrorLine("Return value of wrong type, expected " + str(self.st.getType(funLabel).value), node.pos, "Semantic")
                 self.isTypingValid = False
             
             return returnType
@@ -143,9 +144,9 @@ class TypeChecker():
                 self.isTypingValid = False
                 
                 if type1 != Types.Int:
-                    self.parser.printErrorLine("Int type expected in operation, not " + str(type1.value), node.children[0].pos, "Semantic")
+                    self._printErrorLine("Int type expected in operation, not " + str(type1.value), node.children[0].pos, "Semantic")
                 else:
-                    self.parser.printErrorLine("Int type expected in operation, not " + str(type2.value), node.children[1].pos, "Semantic")
+                    self._printErrorLine("Int type expected in operation, not " + str(type2.value), node.children[1].pos, "Semantic")
             
             return Types.Int
         
@@ -157,7 +158,7 @@ class TypeChecker():
                 return rightType
             
             if leftType != rightType:
-                self.parser.printErrorLine(f"Trying to assign {str(rightType.value)} to {str(leftType.value)} variable", node.children[1].pos, "Semantic")
+                self._printErrorLine(f"Trying to assign {str(rightType.value)} to {str(leftType.value)} variable", node.children[1].pos, "Semantic")
                 self.isTypingValid = False
 
             return rightType
@@ -168,3 +169,11 @@ class TypeChecker():
                 self._doCheckTyping(child, funLabel)
             
             return None
+    
+    def _printErrorLine(self, errorMessage="", pos_=None, errorType="Semantic"):
+        if self.isTypingValid:
+            self.firstErrorMessage = errorMessage
+        
+        self.isTypingValid = False
+        self.parser.printErrorLine(errorMessage, pos_, errorType)
+        return None

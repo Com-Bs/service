@@ -67,7 +67,7 @@ def run_compile():
             # run the compiler 
             compiler = Compiler(program)
             
-            if not compiler.typeChecker.isTypingValid:
+            if not compiler.isTypingValid(prints=False):
                 returnDict['error'] = 'Type checking failed'
                 returnDict['message'] = compiler.typeChecker.firstErrorMessager
                 return jsonify(returnDict), 400
@@ -159,12 +159,10 @@ def run_compile():
         # in different environments, the output is different, but what follows 'Loaded' is the actual output
         output = output[output.find('Loaded'):]  
         
-        # Limit output size to prevent memory exhaustion
+        # First line is the spim output, last line is empty after last new line
         output_lines = output.split('\n')[1:-1]
-        if len(output_lines) > 1000:
-            output_lines = output_lines[:1000] + ["... (output truncated)"]
         
-        returnDict['outputs'] = output_lines
+        returnDict['outputs'] = [int(line) for line in output_lines]
         returnDict['message'] = 'Program executed successfully'
         return jsonify(returnDict), 200
         
@@ -211,6 +209,179 @@ def check_syntax():
         returnDict['error'] = 'Error parsing program'
         returnDict['message'] = str(e)
         return jsonify(returnDict), 500
+    
+def int_to_letters(n):
+    result = ''
+    while True:
+        result = chr(ord('a') + (n % 26)) + result
+        n = n // 26 - 1
+        if n < 0:
+            break
+    return result
+
+@app.route('/performTestCases', methods=['POST'])
+def check_test_cases():
+    data = request.get_json()
+    program = data.get('program', '')
+    function_name = data.get('funName', '')
+    test_cases = data.get('testCases', [])
+    
+    returnDict = {'results': []}
+    resultTemplate = {'error': '', 'line': -1, 'column': -1, 'ouptut': 0}
+    
+    # check inputs
+    if not program:
+        returnDict['error'] = 'No program provided'
+        return jsonify(returnDict), 400
+    if not function_name:
+        returnDict['error'] = 'No function name provided'
+        return jsonify(returnDict), 400
+    if not test_cases:
+        returnDict['error'] = 'No test cases provided'
+        return jsonify(returnDict), 400
+    
+    # compile and run each test case, recording the output
+    for test_case in test_cases:
+        resultDict = resultTemplate.copy()
+        
+        mainFunction = "void main(void) {\n"
+        assignments = ""
+        
+        # create the main function with parameters for testing
+        for i, param in enumerate(test_case):
+            param_ID = int_to_letters(i)
+            # for an int
+            if isinstance(param, int):
+                mainFunction += f"int {param_ID};\n"
+                if (param < 0):
+                    assignments += f"{param_ID} = 0-{str(-param)};\n"
+                else:
+                    assignments += f"{param_ID} = {str(param)};\n"
+            
+            # for an array
+            elif isinstance(param, list):
+                mainFunction += f"int {param_ID}[{len(param)}];\n"
+                for i, value in enumerate(param):
+                    if value < 0:
+                        assignments += f"{param_ID}[{i}] = 0-{str(-value)};\n"
+                    else:
+                        assignments += f"{param_ID}[{i}] = {str(value)};\n"
+            else:
+                returnDict['error'] = f'Invalid parameter type in test case {test_case}'
+                return jsonify(returnDict), 400
+        
+        mainFunction += assignments
+        mainFunction += f"output({function_name}({', '.join(int_to_letters(i) for i in range(len(test_case))) }));\n"
+        mainFunction += "}\n"
+        program_with_main = mainFunction + program
+        
+        sandbox_dir = tempfile.mkdtemp(prefix="sandbox_", dir="/tmp")
+        try:
+            try:
+                # run the compiler 
+                compiler = Compiler(program_with_main)
+                
+                if not compiler.isTypingValid(prints=False):
+                    resultDict['error'] = compiler.typeChecker.firstErrorMessage
+                    returnDict['results'].append(resultDict)
+                    break
+                    
+                parser = compiler.typeChecker.parser
+                if not parser.isSyntaxValid:
+                    resultDict['error'] = parser.firstErrorMessage
+                    resultDict['line'] = parser.lineNumber
+                    resultDict['column'] = parser.columnNumber
+                    returnDict['results'].append(resultDict)
+                    break
+                
+                lexer = parser.lexer
+                if not lexer.isSyntaxValid:
+                    resultDict['error'] = lexer.firstErrorMessage
+                    resultDict['line'] = lexer.errorLine
+                    resultDict['column'] = lexer.errorColumn
+                    returnDict['results'].append(resultDict)
+                    break
+                
+                compiler.compile(f'{sandbox_dir}/output.s')
+                
+            except Exception as e:
+                resultDict['error'] = str(e)
+                returnDict['results'].append(resultDict)
+                break
+
+            try:
+                # Create a more restricted sandbox with specific directory bindings
+                commands = [
+                    "bwrap",
+                    # Bind all necessary system directories
+                    "--ro-bind", "/bin", "/bin",
+                    "--ro-bind", "/usr", "/usr",
+                    "--ro-bind", "/lib", "/lib"
+                ]
+                
+                # prod env needs /lib64, but not in debug mode
+                if not DEBUG:
+                    print("Binding /lib64")
+                    commands.extend(["--ro-bind", "/lib64", "/lib64"])
+                
+                commands += [
+                    "--ro-bind", "/etc", "/etc",
+                    # Create necessary system directories  
+                    "--tmpfs", "/tmp",
+                    "--ro-bind", "/proc", "/proc",
+                    "--ro-bind", "/dev", "/dev",
+                    # Bind our sandbox directory
+                    "--bind", sandbox_dir, sandbox_dir,
+                    # Security options - only IPC and UTS, no network or user/pid
+                    "--unshare-ipc", 
+                    "--unshare-uts",
+                    "--die-with-parent",
+                    "--new-session",
+                    # The actual command
+                    "spim", "-file", f"{sandbox_dir}/output.s"
+                ]
+                
+                result = subprocess.run(
+                    commands,
+                    capture_output=True,
+                    timeout=TIMEOUT
+                )
+            except subprocess.TimeoutExpired:
+                resultDict['error'] = 'Timeout expired while running the compiled file'
+                returnDict['results'].append(resultDict)
+                break
+            
+            except Exception as e:
+                resultDict['error'] = str(e)
+                returnDict['results'].append(resultDict)
+                break
+            
+            # if there was an error running the compiled file
+            if result.stderr:
+                stderr_msg = result.stderr.decode()
+                # Don't expose internal paths in error messages
+                stderr_msg = stderr_msg.replace(sandbox_dir, "/sandbox")
+                
+                resultDict['error'] = stderr_msg
+                returnDict['results'].append(resultDict)
+                break
+            
+            # return all program outputs as a list, except for first (spim output) and last (empty string after last new line)
+            output = result.stdout.decode()
+            
+            # in different environments, the output is different, but what follows 'Loaded' is the actual output
+            output = output[output.find('Loaded'):]  
+            
+            # Limit output size to prevent memory exhaustion
+            output_lines = output.split('\n')[1:-1]
+            
+            resultDict['output'] = int(output_lines[-1])
+            returnDict['results'].append(resultDict)
+        finally:
+            # clean up the sandbox directory, including files
+            shutil.rmtree(sandbox_dir, ignore_errors=True)
+    
+    return jsonify(returnDict), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT, debug=DEBUG, ssl_context='adhoc')

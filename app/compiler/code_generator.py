@@ -40,7 +40,7 @@ class CodeGenerator():
                 asm += f"\t{var.label}: .space {var.arraySize*4}\n"
                 heapCalls += (
                     "   li $v0 9\n"
-                    f"   li $a0 {var.arraySize}\n"
+                    f"   li $a0 {var.arraySize * 4}\n"
                     "   syscall\n"
                     f"   sw $v0, {var.label}\n\n"
                 )
@@ -97,7 +97,7 @@ class CodeGenerator():
                 # if it's an array call the heap and store the adress in a0
                 asm += (
                     "   li $v0 9\n"
-                    f"   li $a0 {size}\n"
+                    f"   li $a0 {size * 4}\n"
                     "   syscall\n"
                     "   move $a0, $v0\n"
                 )
@@ -319,7 +319,7 @@ class CodeGenerator():
                 # if it's an array call the heap and store the adress in a0
                 asm += (
                     "   li $v0 9\n"
-                    f"   li $a0 {var.arraySize}\n"
+                    f"   li $a0 {var.arraySize * 4}\n"
                     "   syscall\n"
                     "   move $a0, $v0\n"
                 )
