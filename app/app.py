@@ -40,6 +40,8 @@ If the number of inputs is not what the program expects, it will default the mis
 """
 @app.route('/runCompile', methods=['POST'])
 def run_compile():
+    returnDict = {'outputs': [], 'error': '', 'message': '', 'line': -1, 'column': -1}
+    
     data = request.get_json()
     program = data.get('program', '')
     inputs = data.get('inputs', [])
@@ -62,12 +64,36 @@ def run_compile():
     # compile the program 
     try:
         try:
-            # run the compiler in strict mode so it raises an exception if there is an error
-            compiler = Compiler(program, strictMode=True)
+            # run the compiler 
+            compiler = Compiler(program)
+            
+            if not compiler.typeChecker.isTypingValid:
+                returnDict['error'] = 'Type checking failed'
+                returnDict['message'] = compiler.typeChecker.firstErrorMessager
+                return jsonify(returnDict), 400
+                
+            parser = compiler.typeChecker.parser
+            if not parser.isSyntaxValid:
+                returnDict['error'] = 'Syntax error in program'
+                returnDict['message'] = parser.firstErrorMessage
+                returnDict['line'] = parser.lineNumber
+                returnDict['column'] = parser.columnNumber
+                return jsonify(returnDict), 400
+            
+            lexer = parser.lexer
+            if not lexer.isSyntaxValid:
+                returnDict['error'] = 'Lexer syntax error'
+                returnDict['message'] = lexer.firstErrorMessage
+                returnDict['line'] = lexer.errorLine
+                returnDict['column'] = lexer.errorColumn
+                return jsonify(returnDict), 400
+            
             compiler.compile(f'{sandbox_dir}/output.s')
             
         except Exception as e:
-            return jsonify({'error': 'Error compiling', 'message': str(e)}), 400
+            returnDict['error'] = 'Error compiling program'
+            returnDict['message'] = str(e)
+            return jsonify(returnDict), 400
             
         # run the compiled file through a mips emulator in a sandbox
         input_data = '\n'.join(str(inp) for inp in inputs) + '\n'
@@ -110,16 +136,22 @@ def run_compile():
                 timeout=TIMEOUT
             )
         except subprocess.TimeoutExpired:
-            return jsonify({'error': 'Timeout expired while running the compiled file'}), 408
+            returnDict['error'] = 'Timeout expired while running the compiled file'
+            return jsonify(returnDict), 408
         except Exception as e:
-            return jsonify({'error': 'Error running compiled file', 'message': str(e)}), 500
+            returnDict['error'] = 'Error running the compiled file'
+            returnDict['message'] = str(e)
+            return jsonify(returnDict), 500
         
         # if there was an error running the compiled file
         if result.stderr:
             stderr_msg = result.stderr.decode()
             # Don't expose internal paths in error messages
             stderr_msg = stderr_msg.replace(sandbox_dir, "/sandbox")
-            return jsonify({'error': 'Error running compiled file', 'message': stderr_msg}), 500
+            
+            returnDict['error'] = 'Error running compiled file'
+            returnDict['message'] = stderr_msg
+            return jsonify(returnDict), 500
         
         # return all program outputs as a list, except for first (spim output) and last (empty string after last new line)
         output = result.stdout.decode()
@@ -132,7 +164,9 @@ def run_compile():
         if len(output_lines) > 1000:
             output_lines = output_lines[:1000] + ["... (output truncated)"]
         
-        return jsonify({'outputs': output_lines}), 200
+        returnDict['outputs'] = output_lines
+        returnDict['message'] = 'Program executed successfully'
+        return jsonify(returnDict), 200
         
     finally:
         # clean up the sandbox directory, including files
@@ -143,27 +177,40 @@ def check_syntax():
     data = request.get_json()
     program = data.get('program', '')
     
+    returnDict= {'isSyntaxCorrect': False, 
+                        'error': '', 
+                        'line': -1, 
+                        'column': -1, 
+                        'message': ""}
+    
     if not program:
-        return jsonify({'error': 'No program provided'}), 400
+        returnDict['error'] = 'No program provided'
+        return jsonify(returnDict), 400
     
     try:
         parser = Parser(program)
         parser.parse()
         
         if not parser.lexer.isSyntaxValid:
-            return jsonify({'isSyntaxCorrect': False, 
-                            'error': parser.lexer.firstErrorMessage, 
-                            'line': parser.lexer.errorLine,
-                            'column': parser.lexer.errorColumn}), 200
-        if not parser.isSyntaxCorrect:
-            return jsonify({'isSyntaxCorrect': False, 
-                            'error': parser.firstErrorMessage, 
-                            'line': parser.lineNumber,
-                            'column': parser.columnNumber}), 200
+            returnDict['error'] = parser.lexer.firstErrorMessage
+            returnDict['line'] = parser.lexer.errorLine
+            returnDict['column'] = parser.lexer.errorColumn
+            return jsonify(returnDict), 200
+        
+        if not parser.isSyntaxValid:
+            returnDict['error'] = parser.firstErrorMessage
+            returnDict['line'] = parser.lineNumber
+            returnDict['column'] = parser.columnNumber
+            return jsonify(returnDict), 200
+
         else:
-            return jsonify({'isSyntaxCorrect': True}), 200
+            returnDict['isSyntaxCorrect'] = True
+            return jsonify(returnDict), 200
+
     except Exception as e:
-        return jsonify({'error': 'Error parsing program', 'message': str(e)}), 500
+        returnDict['error'] = 'Error parsing program'
+        returnDict['message'] = str(e)
+        return jsonify(returnDict), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=PORT, debug=DEBUG, ssl_context='adhoc')

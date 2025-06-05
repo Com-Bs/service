@@ -4,7 +4,7 @@ from .lexer import *
 class Parser():
     def __init__(self, program, strictMode=False):
         self.AST = None
-        self.isSyntaxCorrect = True
+        self.isSyntaxValid = True
         
         self.lastTokenPosition = 0 # used to print error messages
         self.tokenPosition = 0 # is added to the node to map it to the program
@@ -40,9 +40,9 @@ class Parser():
             if self.strictMode:
                 raise Exception(msg)
             else:
-                self.isSyntaxCorrect = False
+                self.isSyntaxValid = False
                 print(msg)
-        if self.isSyntaxCorrect:
+        if self.isSyntaxValid:
             if prints:
                 self.printAST()
         else:
@@ -87,12 +87,12 @@ class Parser():
             line, col = self.lexer.printErrorLine(errorMsg, self.lastTokenPosition)
             
             # store the first error's position
-            if self.isSyntaxCorrect:
+            if self.isSyntaxValid:
                 self.lineNumber = line
                 self.columnNumber = col
                 self.firstErrorMessage = errorMsg
             
-            self.isSyntaxCorrect = False
+            self.isSyntaxValid = False
             
             # when we ignore the error, we act as if it was there, and not consume any token to continue parsing from there
             # otherwise, we consume tokens until we find the one we were expecting
