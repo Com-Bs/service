@@ -1,6 +1,6 @@
 # based on: https://github.com/docker/awesome-compose/blob/master/flask/app/Dockerfile
 
-FROM --platform=$BUILDPLATFORM python:3.13-slim AS builder
+FROM python:3.13-slim AS builder
 
 WORKDIR /app
 
