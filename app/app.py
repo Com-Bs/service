@@ -2,6 +2,7 @@ from compiler import Compiler
 from compiler.parser import Parser
 from flask import Flask, request, jsonify
 import subprocess
+from sys import platform
 import os
 import shutil
 import tempfile
@@ -82,9 +83,9 @@ def run_compile():
             ]
             
             # only bind /lib64 if it exists, to avoid errors
-            if os.path.exists("/lib32"):
-                print("Binding /lib32")
-                commands.extend(["--ro-bind", "/lib32", "/lib32"])
+            if platform == "linux":
+                print("Binding /lib64")
+                commands.extend(["--ro-bind", "/lib64", "/lib64"])
             
             commands += [
                 "--ro-bind", "/etc", "/etc",
