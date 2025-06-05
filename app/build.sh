@@ -10,7 +10,7 @@ CONTAINER_NAME=mips-compiler-prod
 
 # Build the Docker image
 echo "Building Docker image..."
-DOCKER_BUILDKIT=1 docker build -t $IMAGE_NAME .
+DOCKER_BUILDKIT=0 docker build -t $IMAGE_NAME .
 
 # Remove old container if it exists
 if docker ps -a | grep -q $CONTAINER_NAME; then

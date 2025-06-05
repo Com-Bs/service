@@ -2,7 +2,6 @@ from compiler import Compiler
 from compiler.parser import Parser
 from flask import Flask, request, jsonify
 import subprocess
-from sys import platform
 import os
 import shutil
 import tempfile
@@ -82,8 +81,8 @@ def run_compile():
                 "--ro-bind", "/lib", "/lib"
             ]
             
-            # only bind /lib64 if it exists, to avoid errors
-            if platform == "linux":
+            # prod env needs /lib64, but not in debug mode
+            if not DEBUG:
                 print("Binding /lib64")
                 commands.extend(["--ro-bind", "/lib64", "/lib64"])
             
@@ -151,13 +150,18 @@ def check_syntax():
         parser = Parser(program)
         parser.parse()
         
-        if parser.isSyntaxCorrect:
-            return jsonify({'isSyntaxCorrect': True}), 200
-        else:
+        if not parser.lexer.isSyntaxValid:
+            return jsonify({'isSyntaxCorrect': False, 
+                            'error': parser.lexer.firstErrorMessage, 
+                            'line': parser.lexer.errorLine,
+                            'column': parser.lexer.errorColumn}), 200
+        if not parser.isSyntaxCorrect:
             return jsonify({'isSyntaxCorrect': False, 
                             'error': parser.firstErrorMessage, 
                             'line': parser.lineNumber,
                             'column': parser.columnNumber}), 200
+        else:
+            return jsonify({'isSyntaxCorrect': True}), 200
     except Exception as e:
         return jsonify({'error': 'Error parsing program', 'message': str(e)}), 500
 

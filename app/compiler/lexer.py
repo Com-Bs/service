@@ -9,6 +9,11 @@ class Lexer():
         
         self.strictMode = strictMode
         
+        self.isSyntaxValid = True
+        self.firstErrorMessage = ""
+        self.errorLine = 0
+        self.errorColumn = 0
+        
         self.firstFinalState = 15 # all final states are at and after this number
         self.state = state
 
@@ -68,9 +73,17 @@ class Lexer():
             print(errorOutput)
             return lineNumber, columnNumber
     
-    def _handleErrors(self, c):        
-        self.printErrorLine(self._getErrorMessage(c))
-                
+    def _handleErrors(self, c): 
+        errorMessage = self._getErrorMessage(c)      
+        line, pos = self.printErrorLine(errorMessage)
+
+        if self.isSyntaxValid:
+            self.errorLine = line
+            self.errorColumn = pos
+            self.firstErrorMessage = errorMessage
+        
+        self.isSyntaxValid = False
+        
         # reset the lexer to the next position -> it might still lex an error
         self.state = 28
         self.pos += 1
